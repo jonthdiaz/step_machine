@@ -1,0 +1,143 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: StorageMachine
+
+Parameters:
+  env:
+    Type: String
+    Description: "Environment type"
+    AllowedValues:
+      - prod
+      - dev
+    Default: dev
+
+Conditions:
+  IsProd: !Equals [ !Ref env, prod ]
+
+Globals:
+  Function:
+    Timeout: 15
+    Runtime: python3.8
+    MemorySize: !If [IsProd, 1024, 128]
+
+Resources:
+  #StorageMachineAPI:
+  #  Type: AWS::Serverless::Api
+  #  Properties:
+  #    StageName: !Ref env
+
+
+  GeneralBaseRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowLambdaServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+                - "ssm.amazonaws.com"
+                - "s3.amazonaws.com"
+      Policies:
+        - PolicyName: 'BucketS3InteracionsBulkPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: "s3:*"
+                Resource: "*"
+
+        - PolicyName: 'StepFunctionsMachine'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: "states:*"
+                Resource: "*"
+
+  ImagesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      FunctionName: ImagesFunction
+      CodeUri: ./src/images
+      Handler: handler.main
+      Timeout: 120
+      Role: !GetAtt GeneralBaseRole.Arn
+
+
+  TestInvokeMachineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      FunctionName: TestInvokeMachineFunction
+      CodeUri: ./src/InvokeMachine
+      Handler: test_handler.main
+      Timeout: 120
+      Role: !GetAtt GeneralBaseRole.Arn
+
+
+  ProcessFileMachineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      FunctionName: ProcessFileMachineFunction
+      CodeUri: ./src/InvokeMachine
+      Handler: handler.main
+      Timeout: 120
+      Role: !GetAtt GeneralBaseRole.Arn
+      Environment:
+        Variables:
+          MACHINE_ARN: "arn:aws:states:us-west-1:672646104180:stateMachine:ProcessFileMachine"
+
+
+  GetFileTypeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      FunctionName: GetFileTypeFunction
+      CodeUri: ./src/InvokeMachine
+      Handler: handler.get_file_type_image
+      Timeout: 120
+      Role: !GetAtt GeneralBaseRole.Arn
+
+
+  CopyImageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      FunctionName: CopyImageFunction
+      CodeUri: ./src/InvokeMachine
+      Handler: handler.copy_image
+      Timeout: 120
+      Role: !GetAtt GeneralBaseRole.Arn
+
+
+  ResizeImageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      FunctionName: ResizeImageFunction
+      CodeUri: ./src/InvokeMachine
+      Handler: handler.resize_image
+      Timeout: 120
+      Role: !GetAtt GeneralBaseRole.Arn
+
+
+  DeleteImageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      FunctionName: DeleteImageFunction
+      CodeUri: ./src/InvokeMachine
+      Handler: handler.delete_image
+      Timeout: 120
+      Role: !GetAtt GeneralBaseRole.Arn
+
+
